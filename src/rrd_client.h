@@ -63,12 +63,14 @@
 #ifndef WIN32
 int rrdc_connect (const char *addr);
 int rrdc_is_connected(const char *daemon_addr);
+int rrdc_is_any_connected();
 int rrdc_disconnect (void);
 
 int rrdc_update (const char *filename, int values_num,
         const char * const *values);
 
 int rrdc_flush (const char *filename);
+int rrdc_forget (const char *filename);
 int rrdc_flush_if_daemon (const char *opt_daemon, const char *filename);
 
 #else

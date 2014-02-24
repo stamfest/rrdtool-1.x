@@ -363,6 +363,11 @@ int rrdc_is_connected(const char *daemon_addr) /* {{{ */
 
 } /* }}} int rrdc_is_connected */
 
+/* determine whether we are connected to any daemon */
+int rrdc_is_any_connected() {
+  return sd >= 0;
+}
+
 static int rrdc_connect_unix (const char *path) /* {{{ */
 {
   struct sockaddr_un sa;
@@ -636,7 +641,8 @@ int rrdc_update (const char *filename, int values_num, /* {{{ */
   return (status);
 } /* }}} int rrdc_update */
 
-int rrdc_flush (const char *filename) /* {{{ */
+static int rrdc_filebased_command (const char *command, 
+                                   const char *filename) /* {{{ */
 {
   char buffer[4096];
   char *buffer_ptr;
@@ -653,7 +659,7 @@ int rrdc_flush (const char *filename) /* {{{ */
   buffer_ptr = &buffer[0];
   buffer_free = sizeof (buffer);
 
-  status = buffer_add_string ("flush", &buffer_ptr, &buffer_free);
+  status = buffer_add_string (command, &buffer_ptr, &buffer_free);
   if (status != 0)
     return (ENOBUFS);
 
@@ -690,6 +696,13 @@ int rrdc_flush (const char *filename) /* {{{ */
   return (status);
 } /* }}} int rrdc_flush */
 
+int rrdc_flush (const char *filename) {
+  return rrdc_filebased_command("flush", filename);
+}
+
+int rrdc_forget (const char *filename) {
+  return rrdc_filebased_command("forget", filename);
+}
 
 /* convenience function; if there is a daemon specified, or if we can
  * detect one from the environment, then flush the file.  Otherwise, no-op

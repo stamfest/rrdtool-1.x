@@ -1902,7 +1902,7 @@ static int handle_request_last (HANDLER_PROTO) /* {{{ */
 static int handle_request_create (HANDLER_PROTO) /* {{{ */
 {
   char *file, file_tmp[PATH_MAX];
-  char *file_copy, *dir, *dir_tmp[PATH_MAX];
+  char *file_copy, *dir, dir_tmp[PATH_MAX];
   struct stat st;
   char *tok;
   int ac = 0;

@@ -1,5 +1,5 @@
 TESTS = modify1 modify2 modify3 modify4 modify5 \
-	tune1 tune2 rpn1 \
+	tune1 tune2 rpn1 graph1 \
 	rrdcreate \
 	dump-restore \
 	create-with-source-1 create-with-source-2 create-with-source-3 \

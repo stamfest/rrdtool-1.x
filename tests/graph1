@@ -1,0 +1,66 @@
+#!/bin/bash
+
+. $(dirname $0)/functions
+
+BASE=$BASEDIR/$(basename $0)-test
+PREFIX=$BUILDDIR/$(basename $0)-test
+
+# currently, we do not properly copy cdp and pdp information, so for
+# comparison of RRD dumps, we just filter out those parts we do not
+# expect to match anyway...
+function xmlfilter {
+
+#-               <last_ds>1010</last_ds>
+#-               <value>4.0400000000e+04</value>
+#-               <unknown_sec> 0 </unknown_sec>
+#+               <last_ds>U</last_ds>
+#+               <value>0.0000000000e+00</value>
+#+               <unknown_sec> 40 </unknown_sec>
+
+	cat
+#	perl -n -e '$a=join("",<>); $a=~s,<(cdp_prep).*?</\1>,,msg ; print $a'
+}
+
+function numberfilter {
+    perl -n -e '$a=join("",<>); $a=~s,>(\d\.\d\d)\d+,>$1,msg ; print $a'
+}
+
+ST=1300000000
+
+rm -f ${PREFIX}*.rrd ${PREFIX}*.xml
+
+$RRDTOOL create ${PREFIX}a1.rrd --start $(($ST-1)) --step 60 DS:a:GAUGE:120:0:U  RRA:AVERAGE:0.5:1:2000 RRA:AVERAGE:0.5:5:2 RRA:MIN:0.5:5:2 RRA:MAX:0.5:5:2 RRA:LAST:0.5:5:2 
+report createa1
+
+
+
+UPDATEA=
+V=10
+for A in $(seq $ST 60 $(($ST + 86400)) ) ; do
+	UPDATEA="$UPDATEA $A:$V"
+	V=$(($V + 20))
+	SUM=$(($SUM + $V))
+	ST=$A
+	
+	if [ ${#UPDATEA} -gt 2048 ] ; then
+		$RRDTOOL update ${PREFIX}a1.rrd  $UPDATEA || fail update
+		UPDATEA=
+	fi
+done
+AVG=$(($SUM / 1440))
+
+if [ -n "$UPDATEA" ] ; then
+	$RRDTOOL update ${PREFIX}a1.rrd  $UPDATEA || fail update
+fi
+
+$RRDTOOL graph --end $ST --start end-1day ${PREFIX}a1.png DEF:a=${PREFIX}a1.rrd:a:AVERAGE LINE1:a#ff0000:a >/dev/null
+report graph1
+
+PN=$($RRDTOOL graph --imginfo '' --end $ST ${PREFIX}a1.png DEF:a=${PREFIX}a1.rrd:a:AVERAGE CDEF:aa=a,2,* VDEF:b=aa,50,PERCENTNAN LINE1:a#ff0000:a LINE1:b#00ff00:50% PRINT:b:%lg)
+report graph2
+
+perl -e "exit abs($AVG * 2 / $PN - 1) * 100 < 1 ? 0 : 1"
+report percentnan within 1 percent of average
+
+
+rm -f ${PREFIX}*.rrd ${PREFIX}*.xml ${PREFIX}*.png

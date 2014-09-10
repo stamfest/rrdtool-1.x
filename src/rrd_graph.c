@@ -5160,7 +5160,7 @@ int bad_format_imginfo(
     return (n != 3);
 }
 
-
+#define FLOAT_RE "[-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 int vdef_parse(
     struct graph_desc_t
     *gdes,
@@ -5170,23 +5170,55 @@ int vdef_parse(
      * so the parsing is rather simple.  Change if needed.
      */
     double    param;
-    char      func[30], double_str[21];
+    const char *func;
     int       n;
-
+    GError    *gerr = NULL;
+    
     n = 0;
-    sscanf(str, "%20[-0-9.e+],%29[A-Z]%n", double_str, func, &n);
-    if ( rrd_strtodbl( str, NULL, &param, NULL) != 2 ){
-        n = 0;
-        sscanf(str, "%29[A-Z]%n", func, &n);
-        if (n == (int) strlen(str)) {   /* matched */
-            param = DNAN;
-        } else {
-            rrd_set_error
-                ("Unknown function string '%s' in VDEF '%s'",
-                 str, gdes->vname);
+    
+    /* We know the RE is correct ... */
+    GRegex *re = g_regex_new("^(?:(" FLOAT_RE "),)?([A-Z]{1,29})$", G_REGEX_EXTENDED, 0, &gerr);
+    GMatchInfo *mi = NULL;
+    
+    if (gerr != NULL) {
+        rrd_set_error("Cannot compile RE");
+        return -1;
+    }
+    
+    if (g_regex_match(re, str, 0, &mi) != TRUE) {
+        /* does not match! */
+        rrd_set_error("Unmatchable function string '%s' in VDEF '%s'",
+                      str, gdes->vname);
+        g_match_info_free(mi);
+        g_regex_unref(re);
+        return -1;
+    }
+
+    int s, e;
+    g_match_info_fetch_pos(mi, 1, &s, &e);
+
+    /* the parameter */
+    if (s == e) {
+        param = DNAN;
+    } else {
+        /* this will always work... but check anyway */
+        n = rrd_strtodbl(str + s, NULL, &param, NULL);
+        if (n == 0) {
+            rrd_set_error("Cannot parse number in '%s' in VDEF '%s'",
+                          str, gdes->vname);
+            g_match_info_free(mi);
+            g_regex_unref(re);
             return -1;
         }
     }
+    /* the function */
+    g_match_info_fetch_pos(mi, 2, &s, &e);
+    // func is always at the end of the string, so we get away with NOT copying it around
+    func = str + s;
+
+    g_match_info_free(mi);
+    g_regex_unref(re);
+
     if (!strcmp("PERCENT", func))
         gdes->vf.op = VDEF_PERCENT;
     else if (!strcmp("PERCENTNAN", func))
